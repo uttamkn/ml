@@ -67,9 +67,12 @@ class NN:
         nabla_C_w = [np.zeros(w.shape) for w in self.weights]
         nabla_C_b = [np.zeros(b.shape) for b in self.biases]
 
-        # find the sum of gradients of all the input output pairs in the minibatch
         for x, y in mini_batch:
+            # this will give us the gradient of Cost function w.r.t w and b (same shape as self.weights and self.biases)
+            # basically tells us how much to change for all the weights and biases to move towards the minimum
             delta_nabla_C_w, delta_nabla_C_b = self.backprop(x, y)
+
+            # find the sum of gradients of all the input output pairs in the minibatch
             nabla_C_w = [nw + dnw for nw, dnw in zip(nabla_C_w, delta_nabla_C_w)]
             nabla_C_b = [nb + dnb for nb, dnb in zip(nabla_C_b, delta_nabla_C_b)]
 
@@ -87,8 +90,8 @@ class NN:
         Return a tuple ``(nabla_w, nabla_b)`` representing the gradient for the cost function C_x.
         ``nabla_b`` and ``nabla_w`` are layer-by-layer lists of numpy arrays, similar to ``self.biases`` and ``self.weights``.
         """
-        nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
+        nabla_b = [np.zeros(b.shape) for b in self.biases]
 
         # ======= feedforward ========
         activation = x
@@ -104,19 +107,31 @@ class NN:
         # ======== backward pass ========
         # find the loss: now the network has made a prediction (activations[-1]) and you compare it with the correct answer y
         # delta = loss * how sensitive the activation is to changes (sigmoid_prime)
+        # [delta = partial C / partial z]
         delta = self.cost_derivative(activations[-1], y) * sigmoid_prime(zs[-1])
 
         # formulas for gradients for C/w and C/b (can be derived easily)
+        # c/w = c/z . z/w = delta . activation(prev)
         nabla_w[-1] = np.dot(delta, activations[-2].transpose())
+
+        # c/b = c/z . z/b = delta . 1
         nabla_b[-1] = delta
 
         # ignore first layer since its the input layer and the last layer since its already calculated
         for i in range(2, self.num_of_layers):
             z = zs[-i]
-            sp = sigmoid_prime(z)
-            delta = np.dot(self.weights[-i + 1].transpose(), delta) * sp
-            nabla_b[-i] = delta
+            # here the formula for delta changes because the cost does not directly depend on the activations
+            # `delta` is the error of the next layer (already computed).
+            # weights[next] tells you how much current layer activations contributed to each neuron in the next layer.
+            # So, when you multiply weights . old_delta, you're “bringing back” the error from the next layer to this one
+            delta = np.dot(self.weights[-i + 1].transpose(), delta) * sigmoid_prime(z)
+
+            # c/w
             nabla_w[-i] = np.dot(delta, activations[-i - 1].transpose())
+
+            # c/b
+            nabla_b[-i] = delta
+
         return (nabla_w, nabla_b)
 
     def evaluate(self, test_data):

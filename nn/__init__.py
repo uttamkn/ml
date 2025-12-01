@@ -5,8 +5,8 @@ from typing import List, Literal
 import numpy as np
 from numpy.typing import NDArray
 from pydantic import BaseModel, Field, field_validator
-from activation import Activation, ReLU, Sigmoid, Softmax, Tanh
-from cost import CostFunction, CrossEntropy, MeanSquaredError
+from nn.activation import Activation, ReLU, Sigmoid, Softmax, Tanh
+from nn.cost import CostFunction, CrossEntropy, MeanSquaredError
 
 
 class NetworkConfig(BaseModel):

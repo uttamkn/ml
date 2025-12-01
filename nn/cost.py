@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from activation import Activation
+from nn.activation import Activation
 
 
 class CostFunction:

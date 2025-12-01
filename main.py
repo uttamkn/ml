@@ -18,25 +18,23 @@ def main():
     X = scaler.fit_transform(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.1, random_state=42
+        X, y, test_size=0.2, random_state=42
     )
 
-    def one_hot(label):
-        return np.array([[1.0], [0.0]]) if label == 0 else np.array([[0.0], [1.0]])
-
-    training_data = [(x.reshape(30, 1), one_hot(y)) for x, y in zip(X_train, y_train)]
+    training_data = [(x.reshape(30, 1), y) for x, y in zip(X_train, y_train)]
     test_data = [(x.reshape(30, 1), y) for x, y in zip(X_test, y_test)]
 
     print("Building Neural Network...")
     config = NetworkConfig(
-        layer_sizes=[30, 16, 2],
+        layer_sizes=[30, 16, 1],
         activation="relu",
+        output_activation="sigmoid",
         cost_function="cross_entropy",
-        learning_rate=0.0003,
-        epochs=350,
-        mini_batch_size=4,
-        l1_lambda=0.005,
-        l2_lambda=0.02,
+        learning_rate=0.005,
+        epochs=200,
+        mini_batch_size=16,
+        l1_lambda=0,
+        l2_lambda=0,
         verbose=True,
     )
 

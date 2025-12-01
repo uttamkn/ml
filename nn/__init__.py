@@ -14,6 +14,9 @@ class NetworkConfig(BaseModel):
     activation: Literal["sigmoid", "relu", "tanh", "softmax"] = Field(
         "sigmoid", description="Activation function name."
     )
+    output_activation: Literal["sigmoid", "relu", "tanh", "softmax"] = Field(
+        "softmax", description="Output layer activation function name."
+    )
     cost_function: Literal["mse", "cross_entropy"] = Field(
         "cross_entropy", description="Cost function name."
     )
@@ -38,10 +41,12 @@ class NeuralNetwork:
         self.sizes = config.layer_sizes
 
         self.activation_fn = self._make_activation(config.activation)
+        self.output_activation_fn = self._make_activation(config.output_activation)
         self.cost_fn = self._make_cost(config.cost_function)
 
         self.weights = [
-            np.random.randn(y, x) for x, y in zip(self.sizes[:-1], self.sizes[1:])
+            np.random.randn(y, x) * np.sqrt(2 / x)
+            for x, y in zip(self.sizes[:-1], self.sizes[1:])
         ]
         self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
 
@@ -65,11 +70,7 @@ class NeuralNetwork:
 
         # handle last layer separately if softmax
         z = np.dot(self.weights[-1], a) + self.biases[-1]
-        if isinstance(self.activation_fn, Softmax):
-            a = Softmax().fn(z)
-        else:
-            a = self.activation_fn.fn(z)
-        return a
+        return self.output_activation_fn.fn(z)
 
     def calculate_loss(self, data):
         """Calculate the average loss over the given dataset, including regularization terms."""
@@ -115,9 +116,9 @@ class NeuralNetwork:
                     test_loss = self.calculate_loss(test_data)
                     accuracy = self.evaluate(test_data) / len(test_data) * 100
                     print(
-                        f"Epoch {epoch + 1}: Train Loss = {train_loss:.4f}, "
-                        f"Test Loss = {test_loss:.4f}, "
-                        f"Accuracy = {accuracy:.2f}%"
+                        f"Epoch {epoch + 1}: Train Loss = {train_loss}, "
+                        f"Test Loss = {test_loss}, "
+                        f"Accuracy = {accuracy}%"
                     )
                 else:
                     print(f"Epoch {epoch + 1}: Train Loss = {train_loss:.4f}")
@@ -127,7 +128,9 @@ class NeuralNetwork:
         nabla_b = [np.zeros(b.shape) for b in self.biases]
 
         for x, y in mini_batch:
-            delta_nabla_w, delta_nabla_b = self.backprop(x, y)
+            delta_nabla_w, delta_nabla_b = self.backprop(
+                x, y
+            )  # this will give how much to change w and b to reduce cost for 1 input and output example
             nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
             nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
 
@@ -158,14 +161,21 @@ class NeuralNetwork:
         activations = [x]
         zs = []
 
-        for w, b in zip(self.weights, self.biases):
+        for i, (w, b) in enumerate(zip(self.weights, self.biases)):
             z = np.dot(w, activation) + b
             zs.append(z)
-            activation = self.activation_fn.fn(z)
+
+            if i == self.num_layers - 2:  # last layer
+                activation = self.output_activation_fn.fn(z)
+            else:  # hidden layers
+                activation = self.activation_fn.fn(z)
+
             activations.append(activation)
 
         # output layer
-        delta = self.cost_fn.delta(activations[-1], y, zs[-1], self.activation_fn)
+        delta = self.cost_fn.delta(
+            activations[-1], y, zs[-1], self.output_activation_fn
+        )
         nabla_b[-1] = delta
         nabla_w[-1] = np.dot(delta, activations[-2].T)
 
@@ -180,5 +190,17 @@ class NeuralNetwork:
         return nabla_w, nabla_b
 
     def evaluate(self, test_data):
-        results = [(np.argmax(self.feedforward(x)), y) for (x, y) in test_data]
-        return sum(int(pred == truth) for pred, truth in results)
+        correct = 0
+        for x, y in test_data:
+            out = self.feedforward(x)
+
+            if isinstance(self.output_activation_fn, Softmax):
+                pred = np.argmax(out)
+                truth = np.argmax(y)
+            else:
+                pred = int(out > 0.5)
+                truth = int(y > 0.5)
+
+            correct += pred == truth
+
+        return correct

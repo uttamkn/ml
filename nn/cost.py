@@ -6,7 +6,7 @@ from nn.activation import Activation
 class CostFunction:
     """Base class for cost functions."""
 
-    def fn(self, output_activations: NDArray, y: NDArray) -> float:
+    def fn(self, output_activations: NDArray, y: NDArray):
         raise NotImplementedError
 
     def delta(
@@ -30,10 +30,24 @@ class MeanSquaredError(CostFunction):
 
 class CrossEntropy(CostFunction):
     def fn(self, output_activations, y):
-        # Add epsilon to avoid log(0)
-        eps = 1e-10
-        return -np.sum(y * np.log(output_activations + eps))
+        """
+        Supports both:
+        - binary BCE: y in {0,1}, a = sigmoid
+        - categorical CE: y is one-hot, a = softmax
+        """
+        eps = 1e-12
+        a = np.clip(output_activations, eps, 1 - eps)
+
+        # Case 1: Binary classification (scalar output)
+        if a.size == 1:
+            return -(y * np.log(a) + (1 - y) * np.log(1 - a))
+
+        # Case 2: Multi-class classification (one-hot y)
+        return -np.sum(y * np.log(a))
 
     def delta(self, output_activations, y, z, activation):
-        # For sigmoid or softmax outputs: simplified gradient
+        """
+        For sigmoid+CE and softmax+CE:
+            derivative simplifies to a - y
+        """
         return output_activations - y

@@ -20,6 +20,8 @@ class NetworkConfig(BaseModel):
     learning_rate: float = Field(0.1, gt=0)
     epochs: int = Field(30, ge=1)
     mini_batch_size: int = Field(10, ge=1)
+    l1_lambda: float = Field(0.0, ge=0, description="L1 regularization strength")
+    l2_lambda: float = Field(0.0, ge=0, description="L2 regularization strength")
     verbose: bool = True
 
     @field_validator("layer_sizes")
@@ -69,6 +71,31 @@ class NeuralNetwork:
             a = self.activation_fn.fn(z)
         return a
 
+    def calculate_loss(self, data):
+        """Calculate the average loss over the given dataset, including regularization terms."""
+        total_loss = 0.0
+        for x, y in data:
+            output = self.feedforward(x)
+            total_loss += self.cost_fn.fn(output, y)
+
+        # Add L1 and L2 regularization terms
+        l1_penalty = 0.0
+        l2_penalty = 0.0
+
+        if self.config.l1_lambda > 0:
+            l1_penalty = sum(np.sum(np.abs(w)) for w in self.weights)
+
+        if self.config.l2_lambda > 0:
+            l2_penalty = 0.5 * sum(np.sum(w**2) for w in self.weights)
+
+        total_loss = (
+            total_loss / len(data)
+            + self.config.l1_lambda * l1_penalty
+            + self.config.l2_lambda * l2_penalty
+        )
+
+        return total_loss
+
     def SGD(self, training_data, test_data=None):
         n = len(training_data)
         for epoch in range(self.config.epochs):
@@ -81,12 +108,19 @@ class NeuralNetwork:
                 self.update_mini_batch(batch)
 
             if self.config.verbose:
+                train_loss = self.calculate_loss(
+                    training_data[:1000]
+                )  # Use first 1000 examples for speed
                 if test_data:
+                    test_loss = self.calculate_loss(test_data)
+                    accuracy = self.evaluate(test_data) / len(test_data) * 100
                     print(
-                        f"Epoch {epoch + 1}: {self.evaluate(test_data)} / {len(test_data)}"
+                        f"Epoch {epoch + 1}: Train Loss = {train_loss:.4f}, "
+                        f"Test Loss = {test_loss:.4f}, "
+                        f"Accuracy = {accuracy:.2f}%"
                     )
                 else:
-                    print(f"Epoch {epoch + 1} complete")
+                    print(f"Epoch {epoch + 1}: Train Loss = {train_loss:.4f}")
 
     def update_mini_batch(self, mini_batch):
         nabla_w = [np.zeros(w.shape) for w in self.weights]
@@ -99,7 +133,21 @@ class NeuralNetwork:
 
         eta = self.config.learning_rate
         m = len(mini_batch)
-        self.weights = [w - (eta / m) * nw for w, nw in zip(self.weights, nabla_w)]
+
+        # Apply weight updates with L1 and L2 regularization
+        for i, (w, nw) in enumerate(zip(self.weights, nabla_w)):
+            # L2 regularization term (weight decay)
+            if self.config.l2_lambda > 0:
+                nw += self.config.l2_lambda * w
+
+            # L1 regularization term
+            if self.config.l1_lambda > 0:
+                nw += self.config.l1_lambda * np.sign(w)
+
+            # Update weights
+            self.weights[i] = w - (eta / m) * nw
+
+        # Update biases (no regularization)
         self.biases = [b - (eta / m) * nb for b, nb in zip(self.biases, nabla_b)]
 
     def backprop(self, x, y):

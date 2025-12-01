@@ -18,7 +18,7 @@ def main():
     X = scaler.fit_transform(X)
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=0.1, random_state=42
     )
 
     def one_hot(label):
@@ -29,12 +29,14 @@ def main():
 
     print("Building Neural Network...")
     config = NetworkConfig(
-        layer_sizes=[30, 32, 16, 2],
+        layer_sizes=[30, 16, 2],
         activation="relu",
         cost_function="cross_entropy",
-        learning_rate=0.01,
-        epochs=100,
-        mini_batch_size=32,
+        learning_rate=0.0003,
+        epochs=350,
+        mini_batch_size=4,
+        l1_lambda=0.005,
+        l2_lambda=0.02,
         verbose=True,
     )
 
@@ -42,7 +44,11 @@ def main():
     print("Training...")
     nn.SGD(training_data, test_data)
 
-    print("Final Accuracy:", nn.evaluate(test_data), "/", len(test_data))
+    print(
+        "Final Accuracy Percentage:",
+        nn.evaluate(test_data) / len(test_data) * 100,
+        "%",
+    )
 
     def predict(sample):
         output = nn.feedforward(sample.reshape(30, 1))

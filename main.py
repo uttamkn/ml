@@ -1,18 +1,21 @@
-from nn import NetworkConfig, NeuralNetwork
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import pandas as pd
+
+from nn import NetworkConfig, NeuralNetwork
 
 
 def main():
-    print("Loading dataset...")
     df = pd.read_csv("data.csv")
     df = df.drop(columns=["id", "Unnamed: 32"], errors="ignore")
     df["diagnosis"] = df["diagnosis"].map({"M": 1, "B": 0})
 
     X = df.drop("diagnosis", axis=1).values
-    y = df["diagnosis"].values
+    y = df["diagnosis"].values.reshape(-1, 1)
 
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
@@ -24,37 +27,64 @@ def main():
     training_data = [(x.reshape(30, 1), y) for x, y in zip(X_train, y_train)]
     test_data = [(x.reshape(30, 1), y) for x, y in zip(X_test, y_test)]
 
-    print("Building Neural Network...")
-    config = NetworkConfig(
-        layer_sizes=[30, 16, 1],
-        activation="relu",
-        output_activation="sigmoid",
-        cost_function="cross_entropy",
-        learning_rate=0.005,
-        epochs=200,
-        mini_batch_size=16,
-        l1_lambda=0,
-        l2_lambda=0,
-        verbose=True,
-    )
+    print("\n=== Baseline Model Comparison ===")
 
-    nn = NeuralNetwork(config)
-    print("Training...")
-    nn.SGD(training_data, test_data)
+    baselines = {
+        "Logistic Regression": LogisticRegression(max_iter=2000),
+        "SVM (RBF Kernel)": SVC(kernel="rbf"),
+        "KNN (k=5)": KNeighborsClassifier(n_neighbors=5),
+    }
 
-    print(
-        "Final Accuracy Percentage:",
-        nn.evaluate(test_data) / len(test_data) * 100,
-        "%",
-    )
+    for name, model in baselines.items():
+        model.fit(X_train, y_train.ravel())
+        acc = model.score(X_test, y_test.ravel()) * 100
+        print(f"{name}: {acc:.2f}%")
 
-    def predict(sample):
-        output = nn.feedforward(sample.reshape(30, 1))
-        return np.argmax(output)
+    experiments = [
+        ("No Regularization", 0.0, 0.0),
+        ("L2 (1e-3)", 0.0, 1e-3),
+        ("L2 (1e-2)", 0.0, 1e-2),
+        ("L1 (1e-3)", 1e-3, 0.0),
+    ]
 
-    sample = X_test[0]
-    print("Prediction:", predict(sample))
-    print("True Label:", y_test[0])
+    results = {}
+
+    for name, l1, l2 in experiments:
+        print(f"\n=== Neural Network: {name} ===")
+
+        config = NetworkConfig(
+            layer_sizes=[30, 16, 1],
+            activation="relu",
+            output_activation="sigmoid",
+            cost_function="cross_entropy",
+            learning_rate=0.005,
+            epochs=200,
+            mini_batch_size=16,
+            l1_lambda=l1,
+            l2_lambda=l2,
+            verbose=False,
+        )
+
+        nn = NeuralNetwork(config)
+        nn.SGD(training_data, test_data)
+
+        final_acc = nn.test_accuracies[-1]
+        results[name] = final_acc
+
+        print(f"Final Test Accuracy: {final_acc:.2f}%")
+
+        plt.figure()
+        plt.plot(nn.train_losses, label="Train Loss")
+        plt.plot(nn.test_losses, label="Test Loss")
+        plt.title(f"Loss Curve - {name}")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.legend()
+        plt.savefig(f"loss_curve_{name}.png")
+
+    print("\n=== Summary: Neural Network Results ===")
+    for k, v in results.items():
+        print(f"{k}: {v:.2f}%")
 
 
 if __name__ == "__main__":

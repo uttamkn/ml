@@ -40,10 +40,10 @@ class CrossEntropy(CostFunction):
 
         # Case 1: Binary classification (scalar output)
         if a.size == 1:
-            return -(y * np.log(a) + (1 - y) * np.log(1 - a))
+            return float(-(y * np.log(a) + (1 - y) * np.log(1 - a)))
 
         # Case 2: Multi-class classification (one-hot y)
-        return -np.sum(y * np.log(a))
+        return float(-np.sum(y * np.log(a)))
 
     def delta(self, output_activations, y, z, activation):
         """

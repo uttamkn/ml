@@ -99,6 +99,11 @@ class NeuralNetwork:
 
     def SGD(self, training_data, test_data=None):
         n = len(training_data)
+
+        self.train_losses = []
+        self.test_losses = []
+        self.test_accuracies = []
+
         for epoch in range(self.config.epochs):
             np.random.shuffle(training_data)
             mini_batches = [
@@ -108,20 +113,22 @@ class NeuralNetwork:
             for batch in mini_batches:
                 self.update_mini_batch(batch)
 
-            if self.config.verbose:
-                train_loss = self.calculate_loss(
-                    training_data[:1000]
-                )  # Use first 1000 examples for speed
-                if test_data:
-                    test_loss = self.calculate_loss(test_data)
-                    accuracy = self.evaluate(test_data) / len(test_data) * 100
+            train_loss = self.calculate_loss(training_data[:1000])
+            self.train_losses.append(train_loss)
+
+            if test_data:
+                test_loss = self.calculate_loss(test_data)
+                acc = self.evaluate(test_data) / len(test_data) * 100
+                self.test_losses.append(test_loss)
+                self.test_accuracies.append(acc)
+
+                if self.config.verbose:
                     print(
-                        f"Epoch {epoch + 1}: Train Loss = {train_loss}, "
-                        f"Test Loss = {test_loss}, "
-                        f"Accuracy = {accuracy}%"
+                        f"Epoch {epoch + 1}: "
+                        f"Train Loss={train_loss:.4f}, "
+                        f"Test Loss={test_loss:.4f}, "
+                        f"Accuracy={acc:.2f}%"
                     )
-                else:
-                    print(f"Epoch {epoch + 1}: Train Loss = {train_loss:.4f}")
 
     def update_mini_batch(self, mini_batch):
         nabla_w = [np.zeros(w.shape) for w in self.weights]
